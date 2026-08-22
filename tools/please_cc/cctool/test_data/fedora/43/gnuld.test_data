@@ -1,0 +1,5 @@
+#expected: ld="GNU ld 2.45.1"
+#stdout:
+GNU ld version 2.45.1-5.fc43
+
+#stderr:

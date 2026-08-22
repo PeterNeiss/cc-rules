@@ -137,7 +137,13 @@ var matchers = map[stream]matcher{
 		// tools (e.g. the GNU ld build in FreeBSD's devel/binutils package identifies itself simply as "GNU ld (GNU
 		// Binutils)", while the ld build in Ubuntu's binutils package identifies itself as "GNU ld (GNU Binutils for
 		// Ubuntu)"). This regular expression is vendor-agnostic.
-		{ Linker, GNUld, regexp.MustCompile(`^GNU ld \(.*\) (?P<version>[\d.]+)$`) },
+		//
+		// Red Hat-derived distributions patch GNU ld to identify itself with the version number of the binutils package in
+		// which it was distributed, in place of the parenthesised vendor string (e.g. the ld build in Fedora's binutils
+		// package identifies itself as "GNU ld version 2.45.1-5.fc43"). The package release suffix is not part of the
+		// upstream version number and is therefore excluded from the "version" group, which is also why this regular
+		// expression - uniquely among those here - is not anchored at the end of the line.
+		{ Linker, GNUld, regexp.MustCompile(`^GNU ld (?:\(.*\) |version )(?P<version>\d+(?:\.\d+)*)`) },
 		// LLVM contains a configure-time option that enables vendors to prepend optional, arbitrary strings to the names of
 		// its tools (e.g. the LLD builds in FreeBSD's devel/llvm* packages identify themselves simply as "LLD", while the LLD
 		// builds in Ubuntu's lld-* packages identify themselves as "Ubuntu LLD"). This regular expression is vendor-agnostic.

@@ -1,0 +1,11 @@
+# These packages should all be installed from the official Fedora 43 repositories:
+# gcc binutils binutils-gold
+{
+    "compilers": {
+        "/usr/bin/gcc": {"id": "gcc-15", "name": "GCC 15.3.1"}
+    },
+    "linkers": {
+        "/usr/bin/ld.bfd": {"id": "gnuld", "name": "GNU ld 2.45.1"},
+        "/usr/bin/ld.gold": {"id": "gold", "name": "GNU gold 1.16"}
+    }
+}

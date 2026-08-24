@@ -1,3 +1,7 @@
+Version 0.7.2
+-------------
+    * Recognise GNU ld on Fedora
+
 Version 0.7.1
 -------------
     * Don't copy symbol tables when combining BSD-variant ar archives (#97)

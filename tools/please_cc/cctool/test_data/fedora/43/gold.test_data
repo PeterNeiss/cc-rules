@@ -1,0 +1,5 @@
+#expected: ld="GNU gold 1.16"
+#stdout:
+GNU gold (version 2.45.1-5.fc43) 1.16
+
+#stderr:

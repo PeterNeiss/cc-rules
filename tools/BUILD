@@ -1,12 +1,12 @@
 tools = {
     "please_cc": {
-        "version": "0.1.1",
+        "version": "0.1.2",
         "hashes": {
-            "darwin_amd64": "b0f62ee03e2d685ef6b6e3859c61dc452ad4bd361986676e8b8bdac94ddd0ed3",
-            "darwin_arm64": "f62f9824ec5b3ec3b8f6d07968d1851994731d752a295994868c66e56bbe0966",
-            "freebsd_amd64": "47a6087bde791b66a77eab3ca27fa7db4215c0e8a0419822f38e70dc7c5740bb",
-            "linux_amd64": "a44fb9f24097cca844f69f344357fdeeacd94e40d3cf6914f78a48fe0f86b838",
-            "linux_arm64": "13638d7b03ca2204ca4d19075d6f66c04731d84e131cace35ea2b59ec38a0143",
+            "darwin_amd64": "89214821ff2f9862debac7ccf58a87c463c26c948bf738b2432ce48630778f0b",
+            "darwin_arm64": "b5c7448c595d11fb4af618789368d1705e9c827d44b2af24ad97b23629107893",
+            "freebsd_amd64": "d42fa6f139e5faec8baa6e3f0b011d34d78fe3ab5ff92da565d4efbaa78cebdc",
+            "linux_amd64": "c648ac2b393813ab93e1a69032c634f0acc933a411b9a19cf95d7787ef310418",
+            "linux_arm64": "b7ee0bfa5731f17c7083d3ab978f468968ac70079fe40d688d824ec840704c98",
         },
     },
 }

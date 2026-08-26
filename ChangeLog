@@ -1,3 +1,7 @@
+Version 0.7.3
+-------------
+    * Update please_cc with GNU ld recognition change
+
 Version 0.7.2
 -------------
     * Recognise GNU ld on Fedora

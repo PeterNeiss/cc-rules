@@ -43,6 +43,20 @@ def _so_suffix():
     """Returns the filename suffix for a shared library on the target platform."""
     return ".dll" if CONFIG.OS == "windows" else ".so"
 
+
+def _default_ldflags():
+    """Returns the linker flags every binary gets, unless the repo has configured its own.
+
+    The platform default is decided here rather than in a config file. A plugin's own
+    .plzconfig_<arch> is not read when it is used as a plugin - only the config of the repo
+    using it is - so a default set that way works in this repo's own tests and nowhere else.
+    """
+    if CONFIG.CC.DEFAULT_LDFLAGS:
+        return CONFIG.CC.DEFAULT_LDFLAGS
+    # Windows has no libdl, and pthreads arrives through winpthreads, which MinGW links anyway;
+    # -lpthread is accepted there and harmless.
+    return ["-lpthread"] if CONFIG.OS == "windows" else ["-lpthread", "-ldl"]
+
 # Clang >= 16 just require C++20 features to be enabled in order to enable modules, while older versions explicitly
 # require the -fmodules-ts flag.
 _MODULE_FLAGS = ["""'{{ clang && clang < 16 ? "-fmodules-ts" : "-std=c++20" }}'"""]
@@ -427,8 +441,7 @@ def cc_shared_object(name:str, srcs:list=[], hdrs:list=[], out:str='', optional_
       includes (list): Include directories to be added to the compiler's lookup path.
       labels (list): Labels to attach to this rule.
     """
-    if CONFIG.CC.DEFAULT_LDFLAGS:
-        linker_flags += CONFIG.CC.DEFAULT_LDFLAGS
+    linker_flags += _default_ldflags()
 
     provides = None
     if srcs:
@@ -454,14 +467,25 @@ def cc_shared_object(name:str, srcs:list=[], hdrs:list=[], out:str='', optional_
     if not out:
         so = _so_suffix()
         out = f'{name}{so}' if name.startswith('lib') else f'lib{name}{so}'
-    # N.B. linking *against* this on Windows does not work yet: -l<name> needs an import
-    # library describing the DLL's exports, and declaring one as a second output breaks the
-    # shared command template, which names its output as "$OUT" - unset on a multi-output rule.
-    cmds, tools = _binary_cmds(_c, linker_flags, pkg_config_libs, strip, shared=True, test=False)
+    link_flags = linker_flags
+    implib = []
+    if CONFIG.OS == "windows":
+        # Windows resolves a DLL's symbols through an import library rather than through the
+        # DLL, so -l<name> against this needs one of those to exist. With the default output
+        # name of lib<name>.dll this comes out as lib<name>.dll.a, which is what -l<name>
+        # looks for; a rule that sets out itself gets <out>.a, which may not be.
+        #
+        # It is an optional_out rather than an out because a second real output would unset
+        # $OUT, and $OUT is how the shared link command names what it is producing.
+        implib = [out + '.a']
+        # A space here, not a comma: linker flags are escaped into -Wl, form on the way out.
+        link_flags = linker_flags + ['--out-implib ' + implib[0]]
+    cmds, tools = _binary_cmds(_c, link_flags, pkg_config_libs, strip, shared=True, test=False)
     return build_rule(
         name=name,
         srcs={'srcs': srcs, 'hdrs': hdrs},
         outs=[out],
+        optional_outs=implib,
         deps=deps,
         visibility=visibility,
         cmd=cmds,
@@ -473,7 +497,7 @@ def cc_shared_object(name:str, srcs:list=[], hdrs:list=[], out:str='', optional_
         tools=tools,
         test_only=test_only,
         requires=['cc', 'cc_hdrs'],
-        pre_build=_binary_transitive_labels(_c, linker_flags, pkg_config_libs, strip, shared=True, test=False) if deps else None,
+        pre_build=_binary_transitive_labels(_c, link_flags, pkg_config_libs, strip, shared=True, test=False) if deps else None,
         labels=labels,
     )
 
@@ -579,8 +603,7 @@ def cc_binary(name:str, srcs:list=[], hdrs:list=[], private_hdrs:list=[],
         static = False
     if CONFIG.BAZEL_COMPATIBILITY:
         linker_flags = ['-lpthread' if l == '-pthread' else l for l in linker_flags]
-    if CONFIG.CC.DEFAULT_LDFLAGS:
-        linker_flags += CONFIG.CC.DEFAULT_LDFLAGS
+    linker_flags += _default_ldflags()
     if static:
         linker_flags += ['-static']
     cmds, tools = _binary_cmds(_c, linker_flags, pkg_config_libs, strip, static=static, test=False)
@@ -660,8 +683,7 @@ def cc_test(name:str, srcs:list=[], hdrs:list=[], compiler_flags:list&cflags&cop
 
     if CONFIG.BAZEL_COMPATIBILITY:
         linker_flags = ['-lpthread' if l == '-pthread' else l for l in linker_flags]
-    if CONFIG.CC.DEFAULT_LDFLAGS:
-        linker_flags += CONFIG.CC.DEFAULT_LDFLAGS
+    linker_flags += _default_ldflags()
     if CONFIG.CC.TEST_MAIN and not _c:
         deps += [CONFIG.CC.TEST_MAIN]
     cmds, tools = _binary_cmds(_c, linker_flags, pkg_config_libs, test=True)

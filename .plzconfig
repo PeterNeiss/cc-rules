@@ -103,10 +103,9 @@ Help = The default flags to pass to the C++ compiler when compiling a debug buil
 [PluginConfig "default_ldflags"]
 ConfigKey = DefaultLdFlags
 Repeatable = true
-DefaultValue = -lpthread
-DefaultValue = -ldl
+Optional = true
 Inherit = true
-Help = The default flags to pass to the linker.
+Help = The default flags to pass to the linker. Defaults to -lpthread and -ldl, or to -lpthread alone on Windows, which has no libdl.
 
 [PluginConfig "ld_garbage_collection"]
 ConfigKey = LdGarbageCollection

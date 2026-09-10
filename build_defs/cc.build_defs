@@ -26,6 +26,23 @@ _ACTION_FLAGS = [
 
 _COVERAGE_FLAGS = ["--coverage", "-fprofile-dir=."]
 
+def _exe_suffix():
+    """Returns the filename suffix for an executable on the target platform.
+
+    Windows decides what is executable by extension, and the toolchain appends .exe to a -o
+    name that has none, so the rule has to declare the name the compiler will actually write.
+
+    N.B. this has to be evaluated per call rather than once at module level: these build defs
+    are subincluded, and CONFIG.OS there reflects the host until a rule is actually being
+    instantiated for the target architecture.
+    """
+    return ".exe" if CONFIG.OS == "windows" else ""
+
+
+def _so_suffix():
+    """Returns the filename suffix for a shared library on the target platform."""
+    return ".dll" if CONFIG.OS == "windows" else ".so"
+
 # Clang >= 16 just require C++20 features to be enabled in order to enable modules, while older versions explicitly
 # require the -fmodules-ts flag.
 _MODULE_FLAGS = ["""'{{ clang && clang < 16 ? "-fmodules-ts" : "-std=c++20" }}'"""]
@@ -434,9 +451,13 @@ def cc_shared_object(name:str, srcs:list=[], hdrs:list=[], out:str='', optional_
             'cc_hdrs': f':_{name}#lib_hdrs',
             'cc': ':' + name,
         }
-    cmds, tools = _binary_cmds(_c, linker_flags, pkg_config_libs, strip, shared=True, test=False)
     if not out:
-        out = f'{name}.so' if name.startswith('lib') else f'lib{name}.so'
+        so = _so_suffix()
+        out = f'{name}{so}' if name.startswith('lib') else f'lib{name}{so}'
+    # N.B. linking *against* this on Windows does not work yet: -l<name> needs an import
+    # library describing the DLL's exports, and declaring one as a second output breaks the
+    # shared command template, which names its output as "$OUT" - unset on a multi-output rule.
+    cmds, tools = _binary_cmds(_c, linker_flags, pkg_config_libs, strip, shared=True, test=False)
     return build_rule(
         name=name,
         srcs={'srcs': srcs, 'hdrs': hdrs},
@@ -584,7 +605,7 @@ def cc_binary(name:str, srcs:list=[], hdrs:list=[], private_hdrs:list=[],
         deps += [lib_rule]
     return build_rule(
         name=name,
-        outs=[name],
+        outs=[name + _exe_suffix()],
         deps=deps,
         visibility=visibility,
         cmd=cmds,
@@ -675,7 +696,7 @@ def cc_test(name:str, srcs:list=[], hdrs:list=[], compiler_flags:list&cflags&cop
 
     return build_rule(
         name=name,
-        outs=[name],
+        outs=[name + _exe_suffix()],
         deps=deps,
         data=data,
         visibility=visibility,
@@ -707,9 +728,23 @@ def _default_cflags(c:bool=False, dbg:bool=False):
         return CONFIG.CC.DEFAULT_DBG_CPPFLAGS if dbg else CONFIG.CC.DEFAULT_OPT_CPPFLAGS
 
 
+def _check_pkg_config(pkg_config_libs:list, pkg_config_cflags:list=[]):
+    """Fails at parse time if pkg-config is asked for on a platform that has none.
+
+    Windows has no pkg-config: it is not an applet in the busybox that Please bundles, and
+    there is no shim. Failing here names the rule; letting it through produces a build action
+    that dies with 'pkg-config: not found' and no indication of which target asked for it.
+    """
+    if CONFIG.OS == "windows" and (pkg_config_libs or pkg_config_cflags):
+        fail("pkg_config_libs and pkg_config_cflags are not supported on Windows; there is no pkg-config there. List the libraries in linker_flags instead.")
+
+
 def _build_flags(compiler_flags:list=[], pkg_config_libs:list=[], pkg_config_cflags:list=[], defines:list=[], c:bool=False, dbg:bool=False):
     """Builds the list of flags that we'll pass to the compiler invocation."""
-    cflags = _default_cflags(c, dbg) + ["-fPIC"]
+    _check_pkg_config(pkg_config_libs, pkg_config_cflags)
+    # -fPIC is meaningless on Windows: PE images are relocatable by construction, and MinGW
+    # warns that the flag is ignored. Nothing breaks by passing it, but nothing needs it.
+    cflags = _default_cflags(c, dbg) + ([] if CONFIG.OS == "windows" else ["-fPIC"])
 
     if CONFIG.CC.LD_GARBAGE_COLLECTION and not dbg:
         cflags += [
@@ -788,7 +823,8 @@ def _binary_build_flags(linker_flags:list=[], pkg_config_libs:list=[], shared:bo
     oflags += ["""'{{ !ld64 && !appleld ? "-Wl,--end-group" }}'"""]
 
     # Don't add a .note.gnu.build-id section to ELF images. This improves the binary's determinism.
-    lflags = ["""'{{ gnuld || gold || lld ? "-Wl,--build-id=none" }}'"""]
+    # PE images have no such section, so there is nothing to suppress on Windows.
+    lflags = [] if CONFIG.OS == "windows" else ["""'{{ gnuld || gold || lld ? "-Wl,--build-id=none" }}'"""]
 
     if not dbg:
         if CONFIG.CC.LD_GARBAGE_COLLECTION:
@@ -853,6 +889,7 @@ def _library_cmds(c:bool=False, compiler_flags:list=[], pkg_config_libs:list=[],
 def _binary_cmds(c:bool=False, linker_flags:list=[], pkg_config_libs:list=[], strip:bool=None, extra_flags:list=[],
                  shared:bool=False, alwayslink:list=[], static:bool=False, test:bool=False):
     """Returns the commands needed for a cc_binary, cc_test or cc_shared_object rule."""
+    _check_pkg_config(pkg_config_libs)
     dbg_flags = _binary_build_flags(linker_flags, pkg_config_libs, shared, alwayslink, strip, c=c, dbg=True, static=static, test=test)
     opt_flags = _binary_build_flags(linker_flags, pkg_config_libs, shared, alwayslink, strip, c=c, dbg=False, static=static, test=test)
     cmd_template = '"$TOOLS_PLEASE_CC" cc "$TOOLS_CC" -o "$OUT" %s'

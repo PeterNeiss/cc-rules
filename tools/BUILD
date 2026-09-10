@@ -14,7 +14,11 @@ tools = {
 for name, metadata in tools.items():
     version = metadata["version"]
     for a, h in metadata["hashes"].items():
-        native = f"{CONFIG.OS}_{CONFIG.ARCH}" == a
+        # HOSTOS/HOSTARCH, not OS/ARCH: please_cc is a build tool, so it runs on the machine
+        # doing the building whatever is being built for. Keyed on the target instead, a
+        # cross-build to a platform with no published release defines no target called
+        # please_cc at all, and every rule that uses it fails with a missing target.
+        native = f"{CONFIG.HOSTOS}_{CONFIG.HOSTARCH}" == a
         remote_file(
             name = name if native else f"{name}_{a}",
             binary = True,

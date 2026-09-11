@@ -48,8 +48,8 @@ Help = The path or build target for the archiver tool.
 
 [PluginConfig "please_cc_tool"]
 ConfigKey = PleaseCCTool
-DefaultValue = //tools:please_cc
-Help = The path or build target for the please_cc tool, an internal tool used by the build definitions to invoke C/C++ compilers and linkers with appropriate command line arguments.
+Optional = true
+Help = The path or build target for the please_cc tool, an internal tool used by the build definitions to invoke C/C++ compilers and linkers with appropriate command line arguments. Defaults to //tools:please_cc, which is a download; on Windows, where there is no release to download, it defaults to the please_cc the Please install bundles.
 Inherit = true
 
 [PluginConfig "default_opt_cflags"]

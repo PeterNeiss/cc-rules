@@ -62,6 +62,27 @@ def _default_ldflags():
 _MODULE_FLAGS = ["""'{{ clang && clang < 16 ? "-fmodules-ts" : "-std=c++20" }}'"""]
 
 
+def _please_cc_tool():
+    """Returns the please_cc to build with.
+
+    //tools:please_cc is a download of a prebuilt release and there is no Windows one, so a
+    Windows host uses the please_cc the Please release bundles beside please.exe instead, found
+    by name on the build PATH, which always starts with Please's own install directory.
+
+    HOSTOS rather than OS: please_cc runs on the machine doing the building whatever is being
+    built for, so a Linux host cross-compiling to Windows still wants the Linux one.
+
+    The fallback names its own subrepo, because a label returned from a build def is resolved in
+    the caller's package rather than the plugin's, unlike a DefaultValue in .plzconfig.
+
+    N.B. evaluated per call rather than at module level; CONFIG at module level reflects the
+    host rather than what is being built for.
+    """
+    if CONFIG.CC.PLEASE_CC_TOOL:
+        return CONFIG.CC.PLEASE_CC_TOOL
+    return "please_cc" if CONFIG.HOSTOS == "windows" else "///cc//tools:please_cc"
+
+
 def cc_library(name:str, srcs:list=[], hdrs:list=[], private_hdrs:list=[], deps:list=[], out:str='', optional_outs:list=[],
                visibility:list=None, test_only:bool&testonly=False, compiler_flags:list&cflags&copts=[],
                linker_flags:list&ldflags&linkopts=[], pkg_config_libs:list=[], pkg_config_cflags:list=[], includes:list=[],
@@ -901,7 +922,7 @@ def _library_cmds(c:bool=False, compiler_flags:list=[], pkg_config_libs:list=[],
     if CONFIG.CC.COVERAGE:
         cmds['cover'] = cmd_template % ' '.join(common_flags + dbg_flags + _COVERAGE_FLAGS + extra_flags)
     return cmds, {
-        'please_cc': CONFIG.CC.PLEASE_CC_TOOL,
+        'please_cc': _please_cc_tool(),
         'cc': [CONFIG.CC.CC_TOOL if c else CONFIG.CC.CPP_TOOL],
         'arcat': [CONFIG.ARCAT_TOOL if archive else None],
         'ar': [CONFIG.CC.AR_TOOL if archive else None],
@@ -920,7 +941,7 @@ def _binary_cmds(c:bool=False, linker_flags:list=[], pkg_config_libs:list=[], st
         'opt': cmd_template % ' '.join(opt_flags + extra_flags),
     }
     tools = {
-        'please_cc': CONFIG.CC.PLEASE_CC_TOOL,
+        'please_cc': _please_cc_tool(),
         'cc': (CONFIG.CC.CC_TOOL if c else CONFIG.CC.CPP_TOOL),
     }
     if CONFIG.CC.COVERAGE:

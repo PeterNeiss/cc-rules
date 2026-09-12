@@ -26,6 +26,7 @@ for name, metadata in tools.items():
         # cross-build to a platform with no published release defines no target called
         # please_cc at all, and every rule that uses it fails with a missing target.
         native = f"{CONFIG.HOSTOS}_{CONFIG.HOSTARCH}" == a
+        owner = owners.get(a, "please-build")
         remote_file(
             name = name if native else f"{name}_{a}",
             binary = True,
@@ -34,6 +35,6 @@ for name, metadata in tools.items():
             # with no extension in PATHEXT - and Go's exec will not run such a file even given
             # its full path. Every other platform is happy with the name it arrives under.
             out = f"{name}.exe" if a.startswith("windows") else None,
-            url = f"https://github.com/{owners.get(a, 'please-build')}/cc-rules/releases/download/{name}-v{version}/{name}-{version}-{a}",
+            url = f"https://github.com/{owner}/cc-rules/releases/download/{name}-v{version}/{name}-{version}-{a}",
             visibility = ["PUBLIC"] if native else None,
         )

@@ -57,6 +57,51 @@ def _default_ldflags():
     # -lpthread is accepted there and harmless.
     return ["-lpthread"] if CONFIG.OS == "windows" else ["-lpthread", "-ldl"]
 
+def _mingw_prefix():
+    """Returns the cross-toolchain prefix for the Windows architecture being built for."""
+    arch = {"amd64": "x86_64", "arm64": "aarch64"}.get(CONFIG.ARCH, CONFIG.ARCH)
+    return arch + "-w64-mingw32-"
+
+
+def _toolchain_tool(configured:str, unix:str, windows:str):
+    """Returns a compiler or archiver, defaulting it per platform where nothing is configured.
+
+    The platform default is decided here rather than in a config file, and that is not a style
+    preference - it is the only place it works. A plugin's own .plzconfig_<arch> is not read
+    when it is used as a plugin, and the using repo's [Plugin "cc"] values are not consulted for
+    targets *inside* this repo either: they see the PluginConfig defaults and nothing else.
+
+    That is what blocked cc_test on Windows. The UnitTest++ test main is a cc_library here, so
+    it was compiled with the host c++ however the using repo configured the toolchain - it
+    selected the Win32 sources correctly and then handed them to a compiler with no windows.h.
+
+    N.B. evaluated per call rather than at module level; CONFIG at module level reflects the
+    host rather than what is being built for.
+    """
+    if configured:
+        return configured
+    if CONFIG.OS != "windows":
+        return unix
+    # Cross-compiling wants the prefixed cross toolchain; a Windows host wants the plain name,
+    # since that is what MinGW-w64 installs as. Keyed on the host, not the target.
+    return windows if CONFIG.HOSTOS == "windows" else _mingw_prefix() + windows
+
+
+def _cc_tool():
+    """Returns the C compiler to build with."""
+    return _toolchain_tool(CONFIG.CC.CC_TOOL, "cc", "gcc")
+
+
+def _cpp_tool():
+    """Returns the C++ compiler to build with."""
+    return _toolchain_tool(CONFIG.CC.CPP_TOOL, "c++", "g++")
+
+
+def _ar_tool():
+    """Returns the archiver to build with."""
+    return _toolchain_tool(CONFIG.CC.AR_TOOL, "ar", "ar")
+
+
 # Clang >= 16 just require C++20 features to be enabled in order to enable modules, while older versions explicitly
 # require the -fmodules-ts flag.
 _MODULE_FLAGS = ["""'{{ clang && clang < 16 ? "-fmodules-ts" : "-std=c++20" }}'"""]
@@ -238,7 +283,7 @@ def cc_library(name:str, srcs:list=[], hdrs:list=[], private_hdrs:list=[], deps:
             output_is_complete = True,
             tools = {
                 'arcat': [CONFIG.ARCAT_TOOL],
-                'ar': [CONFIG.CC.AR_TOOL],
+                'ar': [_ar_tool()],
             },
         )
         if alwayslink:
@@ -431,7 +476,7 @@ def cc_static_library(name:str, srcs:list=[], hdrs:list=[], compiler_flags:list&
         requires = ['cc'],
         tools = {
             'arcat': [CONFIG.ARCAT_TOOL],
-            'ar': [CONFIG.CC.AR_TOOL],
+            'ar': [_ar_tool()],
         },
         labels = labels,
     )
@@ -923,9 +968,9 @@ def _library_cmds(c:bool=False, compiler_flags:list=[], pkg_config_libs:list=[],
         cmds['cover'] = cmd_template % ' '.join(common_flags + dbg_flags + _COVERAGE_FLAGS + extra_flags)
     return cmds, {
         'please_cc': _please_cc_tool(),
-        'cc': [CONFIG.CC.CC_TOOL if c else CONFIG.CC.CPP_TOOL],
+        'cc': [_cc_tool() if c else _cpp_tool()],
         'arcat': [CONFIG.ARCAT_TOOL if archive else None],
-        'ar': [CONFIG.CC.AR_TOOL if archive else None],
+        'ar': [_ar_tool() if archive else None],
     }
 
 
@@ -942,7 +987,7 @@ def _binary_cmds(c:bool=False, linker_flags:list=[], pkg_config_libs:list=[], st
     }
     tools = {
         'please_cc': _please_cc_tool(),
-        'cc': (CONFIG.CC.CC_TOOL if c else CONFIG.CC.CPP_TOOL),
+        'cc': (_cc_tool() if c else _cpp_tool()),
     }
     if CONFIG.CC.COVERAGE:
         cmds['cover'] = cmd_template % ' '.join(dbg_flags + extra_flags + _COVERAGE_FLAGS)

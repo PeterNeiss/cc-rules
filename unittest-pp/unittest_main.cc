@@ -8,8 +8,16 @@
 #include <fstream>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <vector>
+
+#ifdef _WIN32
+// Windows has no unistd.h, and no unsetenv: assigning an empty value is how it removes a
+// variable. execvp lives in process.h there rather than unistd.h.
+#include <process.h>
+#define unsetenv(name) _putenv(name "=")
+#else
+#include <unistd.h>
+#endif
 
 #include "UnitTest++/UnitTest++.h"
 #include "UnitTest++/XmlTestReporter.h"

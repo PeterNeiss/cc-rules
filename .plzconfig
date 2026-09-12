@@ -30,21 +30,21 @@ Help = The path or build target for the C coverage analysis tool.
 
 [PluginConfig "cc_tool"]
 ConfigKey = CCTool
-DefaultValue = cc
+Optional = true
 Inherit = true
-Help = The path or build target for the C compiler tool.
+Help = The path or build target for the C compiler tool. Defaults to cc, or to the MinGW-w64 toolchain when building for Windows.
 
 [PluginConfig "cpp_tool"]
 ConfigKey = CPPTool
-DefaultValue = c++
+Optional = true
 Inherit = true
-Help = The path or build target for the C++ compiler tool.
+Help = The path or build target for the C++ compiler tool. Defaults to c++, or to the MinGW-w64 toolchain when building for Windows.
 
 [PluginConfig "ar_tool"]
 ConfigKey = ARTool
-DefaultValue = ar
+Optional = true
 Inherit = true
-Help = The path or build target for the archiver tool.
+Help = The path or build target for the archiver tool. Defaults to ar, or to the MinGW-w64 toolchain when building for Windows.
 
 [PluginConfig "please_cc_tool"]
 ConfigKey = PleaseCCTool
